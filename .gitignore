@@ -1,0 +1,5 @@
+node_modules/
+dist/
+packaged.yaml
+npm-debug.log
+results.xml

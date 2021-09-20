@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: CDCu Example 1 CloudFormation template.
+
+Parameters:
+  Stage:
+    Description: The stage environment for this template.
+    Type: String
+    Default : dev
+    AllowedValues:
+      - dev
+      - prod
+
+Resources:
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub "lambda-cdcu-example1-${Stage}-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
+      Policies:
+          -
+            PolicyName: "lambda-cdcu-example1"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                -
+                  Effect: "Allow"
+                  Action:
+                    - "dynamodb:GetItem"
+                    - "dynamodb:PutItem"
+                    - "dynamodb:Scan"
+                  Resource:
+                    - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/accounts-${Stage}"
+
+  AccountsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - LambdaRole
+    Properties:
+      FunctionName: !Sub "cdcu-example1-${Stage}"
+      Description: "CDCu example 1 Lambda function"
+      Handler: index.handler
+      Runtime: nodejs14.x
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt LambdaRole.Arn
+      CodeUri: ./dist
+      Tags:
+        environment: !Ref Stage
+        application: CDCu Samples
+      Environment:
+        Variables:
+          STAGE: !Ref Stage
+      Events:
+        AccountCreate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AccountsAPI
+            Path: /v1/accounts
+            Method: post
+        AccountList:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AccountsAPI
+            Path: /v1/accounts
+            Method: get
+        AccountGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AccountsAPI
+            Path: /v1/accounts/{id}
+            Method: get
+
+
+  AccountsAPI:
+    Type: AWS::Serverless::Api
+    DependsOn:
+      - AccountsFunction
+    Properties:
+      Name: !Sub "CDCu Example 1-${Stage}"
+      StageName: !Ref Stage
+      DefinitionBody:
+        swagger: "2.0"
+        info:
+          version: "1.0"
+          title: "Definition for CDCu Example 1 REST APIs"
+        schemes:
+          - "https"
+        paths:
+          /v1/accounts:
+            get:
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AccountsFunction.Arn}/invocations
+                passthroughBehavior: "when_no_match"
+                httpMethod: "POST"
+                type: "aws_proxy"
+            post:
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AccountsFunction.Arn}/invocations
+                passthroughBehavior: "when_no_match"
+                httpMethod: "POST"
+                type: "aws_proxy"
+            options:
+              consumes:
+              - "application/json"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+          /v1/accounts/{id}:
+            get:
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AccountsFunction.Arn}/invocations
+                passthroughBehavior: "when_no_match"
+                httpMethod: "POST"
+                type: "aws_proxy"
+            options:
+              consumes:
+              - "application/json"
+              produces:
+              - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+        definitions:
+          Empty:
+            type: "object"
+            title: "Empty Schema"
+
+  AccountsInvokePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - AccountsAPI
+    Properties:
+      FunctionName: !GetAtt AccountsFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AccountsAPI}/*/*"

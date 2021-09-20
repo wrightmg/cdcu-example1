@@ -1,0 +1,25 @@
+{
+  "name": "cdcu-example1",
+  "version": "1.0.0",
+  "description": "Sample for CDCu AWS workshop",
+  "main": "index.js",
+  "scripts": {
+    "clean": "gulp clean",
+    "build": "gulp build",
+    "validate": "aws cloudformation validate-template --template-body file://template.yaml",
+    "package": "aws cloudformation package --template-file template.yaml --s3-bucket cdcu-sample --s3-prefix sample-services --output-template-file packaged.yaml",
+    "deploy": "aws cloudformation deploy --template-file packaged.yaml --stack-name cdcu-api-example-dev --capabilities CAPABILITY_NAMED_IAM --parameter-overrides Stage=dev",
+    "deploy-prod": "aws cloudformation deploy --template-file packaged.yaml --stack-name cdcu-api-example-prod --capabilities CAPABILITY_NAMED_IAM --parameter-overrides Stage=prod"
+  },
+  "author": "Michael Wright <michael.wright@lasso.io>",
+  "license": "Unlicense",
+  "devDependencies": {
+    "aws-sdk": "^2.991.0",
+    "del": "^6.0.0",
+    "gulp": "^4.0.2",
+    "gulp-install": "^1.1.0"
+  },
+  "dependencies": {
+    "joi": "^17.4.2"
+  }
+}
